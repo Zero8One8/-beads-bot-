@@ -31,7 +31,6 @@ async def check_pending_orders():
                     c.execute("UPDATE orders SET status = 'cancelled' WHERE id = ?", (order['id'],))
                     logger.info(f"Заказ #{order['id']} отменён (не оплачен 24ч)")
                     
-                    # Уведомление пользователю (можно добавить)
         except Exception as e:
             logger.error(f"Ошибка в check_pending_orders: {e}")
 
@@ -52,7 +51,6 @@ async def check_birthdays():
                 birthday_users = c.fetchall()
                 
                 for user in birthday_users:
-                    # Проверяем, не отправляли ли уже сегодня
                     c.execute("""
                         SELECT 1 FROM birthday_promos
                         WHERE user_id = ? AND date = date('now')
@@ -62,7 +60,6 @@ async def check_birthdays():
                     
                     promo_code = f"BDAY{user['user_id']}{datetime.now().strftime('%d%m')}"
                     
-                    # Создаём промокод
                     c.execute("""
                         INSERT INTO promocodes (code, discount_pct, max_uses, created_at)
                         VALUES (?, 15, 1, ?)
@@ -73,7 +70,6 @@ async def check_birthdays():
                         VALUES (?, ?, date('now'))
                     """, (user['user_id'], promo_code))
                     
-                    # Здесь можно добавить отправку уведомления пользователю
                     logger.info(f"Создан birthday-промокод {promo_code} для {user['user_id']}")
                     
         except Exception as e:
