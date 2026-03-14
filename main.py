@@ -96,17 +96,16 @@ dp.include_router(admin_settings.router)
 
 # Фоновые задачи
 async def background_tasks():
+    """Фоновые задачи."""
     from src.services.background import (
         check_pending_orders,
         check_birthdays,
-        check_expired_subscriptions,
-        check_cart_reminders
+        check_expired_subscriptions
     )
     await asyncio.gather(
         check_pending_orders(),
         check_birthdays(),
         check_expired_subscriptions(),
-        check_cart_reminders(),
         return_exceptions=True
     )
 
