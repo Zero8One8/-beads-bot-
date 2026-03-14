@@ -107,7 +107,7 @@ async def contact_master(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.message(F.text, F.chat.func(lambda chat: True))
+@router.message(F.text)
 async def contact_message_received(message: Message, state: FSMContext, bot):
     """Получение сообщения для мастера."""
     current_state = await state.get_state()
