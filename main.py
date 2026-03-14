@@ -43,7 +43,7 @@ from src.handlers import admin_export
 from src.handlers import admin_scheduler
 from src.handlers import admin_site
 from src.handlers import admin_settings
-from src.handlers import admin_content  # <--- ДОБАВЛЕННАЯ СТРОКА
+from src.handlers.admin_content import router as admin_content_router  # <--- ИСПРАВЛЕНО
 
 # Настройка логирования
 logging.basicConfig(
@@ -94,7 +94,7 @@ dp.include_router(admin_export.router)
 dp.include_router(admin_scheduler.router)
 dp.include_router(admin_site.router)
 dp.include_router(admin_settings.router)
-dp.include_router(admin_content.router)  # <--- ДОБАВЛЕННАЯ СТРОКА
+dp.include_router(admin_content_router)  # <--- ИСПРАВЛЕНО
 
 # Фоновые задачи
 async def background_tasks():
