@@ -1,10 +1,10 @@
 """
 Модуль диагностики - вход в целительские услуги.
-Полностью перенесён из старого main.py.
 """
 import logging
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime
@@ -13,7 +13,6 @@ from src.database.db import db
 from src.database.models import UserModel, DiagnosticModel
 from src.keyboards.diagnostic import get_diagnostic_keyboard, get_diagnostic_admin_keyboard
 from src.services.stars_payment import StarsPayment
-from src.services.notifications import AdminNotifier
 from src.config import Config
 
 logger = logging.getLogger(__name__)
@@ -29,9 +28,6 @@ class DiagnosticStates(StatesGroup):
 @router.callback_query(F.data == "diagnostic")
 async def diagnostic_start(callback: CallbackQuery, state: FSMContext):
     """Вход в диагностику."""
-    user_id = callback.from_user.id
-    
-    # Проверяем, не проходил ли уже диагностику (можно пропускать, если хочет ещё)
     await callback.message.edit_text(
         "🔮 *ЭНЕРГЕТИЧЕСКАЯ ДИАГНОСТИКА*\n\n"
         "Это первый шаг к глубокой работе с вашим состоянием.\n"
@@ -72,7 +68,6 @@ async def diagnostic_paid(message: Message, state: FSMContext, bot: Bot):
         
         await state.set_state(DiagnosticStates.waiting_photo1)
         
-        # Сохраняем информацию о платеже
         with db.cursor() as c:
             c.execute("""
                 INSERT INTO stars_orders (user_id, order_id, item_name, stars_amount, charge_id, created_at)
@@ -127,7 +122,6 @@ async def diagnostic_notes(message: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
     user_id = message.from_user.id
     
-    # Сохраняем в БД
     diag_id = DiagnosticModel.create(
         user_id=user_id,
         notes=notes,
@@ -142,12 +136,11 @@ async def diagnostic_notes(message: Message, state: FSMContext, bot: Bot):
         "Вы получите уведомление в этом чате."
     )
     
-    # Уведомление админу
     await notify_admin_diagnostic(bot, user_id, diag_id, notes, data['photo1'], data.get('photo2'))
 
 
 async def notify_admin_diagnostic(bot: Bot, user_id: int, diag_id: int, notes: str, photo1: str, photo2: str = None):
-    """Уведомление админа о новой диагностике (из старого кода)."""
+    """Уведомление админа о новой диагностике."""
     user = UserModel.get(user_id)
     name = user['first_name'] or user['username'] or str(user_id)
     uname = f"@{user['username']}" if user.get('username') else "нет"
@@ -196,7 +189,6 @@ async def diagnostic_result_save(message: Message, state: FSMContext, bot: Bot):
     diag_id = data['diag_id']
     result_text = message.text
     
-    # Получаем информацию о диагностике
     with db.cursor() as c:
         c.execute("SELECT user_id FROM diagnostics WHERE id = ?", (diag_id,))
         row = c.fetchone()
@@ -206,10 +198,8 @@ async def diagnostic_result_save(message: Message, state: FSMContext, bot: Bot):
             return
         user_id = row['user_id']
     
-    # Обновляем статус
     DiagnosticModel.set_result(diag_id, result_text)
     
-    # Отправляем клиенту
     await bot.send_message(
         user_id,
         f"🔮 *РЕЗУЛЬТАТ ВАШЕЙ ДИАГНОСТИКИ*\n\n{result_text}\n\n"
@@ -221,4 +211,4 @@ async def diagnostic_result_save(message: Message, state: FSMContext, bot: Bot):
     )
     
     await state.clear()
-    await message.answer("✅ Результат отправлен клиенту!")
+    await message.answer("✅ Результат отправлен клиенту
