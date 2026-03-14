@@ -211,4 +211,4 @@ async def diagnostic_result_save(message: Message, state: FSMContext, bot: Bot):
     )
     
     await state.clear()
-    await message.answer("✅ Результат отправлен клиенту
+    await message.answer("✅ Результат отправлен клиенту!")
