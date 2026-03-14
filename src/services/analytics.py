@@ -8,6 +8,46 @@ from collections import defaultdict
 from src.database.db import db
 
 
+class FunnelTracker:
+    """
+    Трекер воронки продаж.
+    """
+    
+    EVENTS = {
+        'start': '👋 Начало работы',
+        'view_showcase': '👁️ Просмотр витрины',
+        'add_to_cart': '🛒 Добавление в корзину',
+        'checkout': '💳 Начало оформления',
+        'payment_success': '✅ Успешная оплата'
+    }
+    
+    @staticmethod
+    async def track(user_id: int, event_type: str, details: str = None):
+        """Отследить событие в воронке."""
+        with db.cursor() as c:
+            c.execute("""
+                INSERT INTO funnel_stats (user_id, event_type, details, created_at)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, event_type, details, datetime.now()))
+    
+    @staticmethod
+    def get_stats(days: int = 30) -> Dict[str, int]:
+        """Получить статистику воронки."""
+        events = ['start', 'view_showcase', 'add_to_cart', 'checkout', 'payment_success']
+        result = {}
+        
+        with db.cursor() as c:
+            for event in events:
+                c.execute("""
+                    SELECT COUNT(DISTINCT user_id) as users
+                    FROM funnel_stats
+                    WHERE event_type = ? AND created_at > datetime('now', ?)
+                """, (event, f'-{days} days'))
+                result[event] = c.fetchone()['users'] or 0
+        
+        return result
+
+
 class Analytics:
     """
     Класс для сбора аналитических данных.
@@ -19,11 +59,9 @@ class Analytics:
         Статистика по пользователям за последние N дней.
         """
         with db.cursor() as c:
-            # Всего пользователей
             c.execute("SELECT COUNT(*) as total FROM users")
             total_users = c.fetchone()['total']
             
-            # Новые за период
             c.execute("""
                 SELECT COUNT(*) as new 
                 FROM users 
@@ -31,7 +69,6 @@ class Analytics:
             """, (f'-{days} days',))
             new_users = c.fetchone()['new']
             
-            # Активные (заходили в бота)
             c.execute("""
                 SELECT COUNT(DISTINCT user_id) as active
                 FROM funnel_stats
@@ -39,7 +76,6 @@ class Analytics:
             """, (f'-{days} days',))
             active_users = c.fetchone()['active']
             
-            # По дням (для графика)
             c.execute("""
                 SELECT DATE(created_at) as date, COUNT(*) as count
                 FROM users
@@ -62,13 +98,11 @@ class Analytics:
         Статистика по заказам за последние N дней.
         """
         with db.cursor() as c:
-            # Всего заказов
             c.execute("SELECT COUNT(*) as total, SUM(total_price) as total_revenue FROM orders WHERE status = 'paid'")
             row = c.fetchone()
             total_orders = row['total'] or 0
             total_revenue = float(row['total_revenue'] or 0)
             
-            # За период
             c.execute("""
                 SELECT COUNT(*) as count, SUM(total_price) as revenue
                 FROM orders
@@ -78,10 +112,8 @@ class Analytics:
             period_orders = row['count'] or 0
             period_revenue = float(row['revenue'] or 0)
             
-            # Средний чек
             avg_check = period_revenue / period_orders if period_orders > 0 else 0
             
-            # По дням
             c.execute("""
                 SELECT DATE(created_at) as date, COUNT(*) as count, SUM(total_price) as revenue
                 FROM orders
@@ -148,19 +180,7 @@ class Analytics:
         """
         Статистика воронки продаж.
         """
-        events = ['start', 'view_showcase', 'add_to_cart', 'checkout', 'payment_success']
-        result = {}
-        
-        with db.cursor() as c:
-            for event in events:
-                c.execute("""
-                    SELECT COUNT(DISTINCT user_id) as users
-                    FROM funnel_stats
-                    WHERE event_type = ? AND created_at > datetime('now', ?)
-                """, (event, f'-{days} days'))
-                result[event] = c.fetchone()['users'] or 0
-        
-        return result
+        return FunnelTracker.get_stats(days)
     
     @staticmethod
     def get_cashback_stats() -> Dict[str, Any]:
