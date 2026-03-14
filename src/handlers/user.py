@@ -4,13 +4,13 @@
 import logging
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 
+from src.database.db import db
 from src.database.models import UserModel, SettingsModel
 from src.keyboards.inline import get_main_keyboard
 from src.services.analytics import FunnelTracker
-from src.services.notifications import AdminNotifier
 from src.config import Config
 
 logger = logging.getLogger(__name__)
@@ -107,9 +107,13 @@ async def contact_master(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.message(StateFilter("waiting_contact_message"))
+@router.message(F.text, F.chat.func(lambda chat: True))
 async def contact_message_received(message: Message, state: FSMContext, bot):
     """Получение сообщения для мастера."""
+    current_state = await state.get_state()
+    if current_state != "waiting_contact_message":
+        return
+    
     user_id = message.from_user.id
     user = UserModel.get(user_id)
     name = user['first_name'] or user['username'] or str(user_id)
@@ -135,7 +139,6 @@ async def referral_info(callback: CallbackQuery):
     bot_username = (await callback.bot.get_me()).username
     ref_link = f"https://t.me/{bot_username}?start=ref{user_id}"
     
-    from src.database.models import ReferralModel
     with db.cursor() as c:
         c.execute("SELECT balance, total_earned, referral_count FROM referral_balance WHERE user_id = ?", (user_id,))
         row = c.fetchone()
@@ -163,5 +166,4 @@ async def referral_info(callback: CallbackQuery):
             [InlineKeyboardButton(text="🔙 НАЗАД", callback_data="menu")]
         ])
     )
-    await callback.answer()get_main_keyboard()
-    )
+    await callback.answer()
