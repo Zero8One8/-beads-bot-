@@ -4,7 +4,7 @@ def init_db():
     """Создаёт все таблицы, если их нет."""
     with db.connection() as conn:
         c = conn.cursor()
-        
+
         # Пользователи и админы
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -17,7 +17,7 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS admins (
             admin_id INTEGER PRIMARY KEY
         )''')
-        
+
         # Категории и товары
         c.execute('''CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +55,7 @@ def init_db():
             created_at TIMESTAMP,
             FOREIGN KEY(collection_id) REFERENCES showcase_collections(id)
         )''')
-        
+
         # Корзина и заказы
         c.execute('''CREATE TABLE IF NOT EXISTS cart (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +89,7 @@ def init_db():
             price REAL,
             created_at TIMESTAMP
         )''')
-        
+
         # Диагностика
         c.execute('''CREATE TABLE IF NOT EXISTS diagnostics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +103,7 @@ def init_db():
             photo2_file_id TEXT,
             followup_sent INTEGER DEFAULT 0
         )''')
-        
+
         # Кастомные заказы
         c.execute('''CREATE TABLE IF NOT EXISTS custom_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +117,7 @@ def init_db():
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP
         )''')
-        
+
         # Музыка и тренировки
         c.execute('''CREATE TABLE IF NOT EXISTS music (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,7 +135,7 @@ def init_db():
             difficulty TEXT,
             created_at TIMESTAMP
         )''')
-        
+
         # Услуги и расписание
         c.execute('''CREATE TABLE IF NOT EXISTS services (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,7 +164,7 @@ def init_db():
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP
         )''')
-        
+
         # Подарочные сертификаты
         c.execute('''CREATE TABLE IF NOT EXISTS gift_certificates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,7 +179,7 @@ def init_db():
             created_at TIMESTAMP,
             expires_at TIMESTAMP
         )''')
-        
+
         # Избранное
         c.execute('''CREATE TABLE IF NOT EXISTS wishlist (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,7 +188,7 @@ def init_db():
             added_at TIMESTAMP,
             UNIQUE(user_id, item_id)
         )''')
-        
+
         # FAQ
         c.execute('''CREATE TABLE IF NOT EXISTS faq (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -197,14 +197,14 @@ def init_db():
             sort_order INTEGER DEFAULT 0,
             active INTEGER DEFAULT 1
         )''')
-        
+
         # Напоминания о корзине
         c.execute('''CREATE TABLE IF NOT EXISTS cart_reminders (
             user_id INTEGER PRIMARY KEY,
             last_reminder TIMESTAMP,
             reminded INTEGER DEFAULT 0
         )''')
-        
+
         # База знаний
         c.execute('''CREATE TABLE IF NOT EXISTS knowledge (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,7 +225,7 @@ def init_db():
             forms TEXT,
             notes TEXT
         )''')
-        
+
         # Квизы
         c.execute('''CREATE TABLE IF NOT EXISTS quiz_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,7 +259,7 @@ def init_db():
             top3 TEXT,
             created_at TIMESTAMP
         )''')
-        
+
         # Истории
         c.execute('''CREATE TABLE IF NOT EXISTS stories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,7 +270,7 @@ def init_db():
             created_at TIMESTAMP,
             auto_generated BOOLEAN DEFAULT FALSE
         )''')
-        
+
         # Рефералы и бонусы
         c.execute('''CREATE TABLE IF NOT EXISTS referrals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -292,7 +292,7 @@ def init_db():
             order_id INTEGER,
             created_at TIMESTAMP
         )''')
-        
+
         # Промокоды
         c.execute('''CREATE TABLE IF NOT EXISTS promocodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -312,7 +312,7 @@ def init_db():
             used_at TIMESTAMP,
             PRIMARY KEY (user_id, code)
         )''')
-        
+
         # Клуб
         c.execute('''CREATE TABLE IF NOT EXISTS club_subscriptions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -326,7 +326,7 @@ def init_db():
             created_at TIMESTAMP,
             updated_at TIMESTAMP
         )''')
-        
+
         # Планировщик постов
         c.execute('''CREATE TABLE IF NOT EXISTS scheduled_posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -338,7 +338,7 @@ def init_db():
             published_at TIMESTAMP,
             created_at TIMESTAMP
         )''')
-        
+
         # Статистика воронки
         c.execute('''CREATE TABLE IF NOT EXISTS funnel_stats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -347,13 +347,13 @@ def init_db():
             details TEXT,
             created_at TIMESTAMP
         )''')
-        
+
         # Настройки
         c.execute('''CREATE TABLE IF NOT EXISTS bot_settings (
             key TEXT PRIMARY KEY,
             value TEXT
         )''')
-        
+
         # Рассылки
         c.execute('''CREATE TABLE IF NOT EXISTS broadcasts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -364,7 +364,7 @@ def init_db():
             total_count INTEGER,
             created_at TIMESTAMP
         )''')
-        
+
         # Push-уведомления
         c.execute('''CREATE TABLE IF NOT EXISTS push_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -374,7 +374,7 @@ def init_db():
             sent_at TIMESTAMP,
             clicked BOOLEAN DEFAULT FALSE
         )''')
-        
+
         # Звёздные заказы
         c.execute('''CREATE TABLE IF NOT EXISTS stars_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -386,7 +386,16 @@ def init_db():
             status TEXT DEFAULT 'paid',
             created_at TIMESTAMP
         )''')
-        
+
+        # ── ИСПРАВЛЕНИЕ: таблица для именинных промокодов ──────────────
+        c.execute('''CREATE TABLE IF NOT EXISTS birthday_promos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            promo_code TEXT,
+            date DATE,
+            UNIQUE(user_id, date)
+        )''')
+
         # Индексы
         c.execute("CREATE INDEX IF NOT EXISTS idx_cart_user ON cart(user_id, status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)")
@@ -394,5 +403,5 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_diag_user ON diagnostics(user_id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_funnel_user ON funnel_stats(user_id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_funnel_date ON funnel_stats(created_at)")
-        
+
         conn.commit()
