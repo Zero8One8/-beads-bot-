@@ -8,12 +8,14 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 
+from src.database.db import db
 from src.database.models import ClubModel, UserModel
 from src.keyboards.club import (
     get_club_main_keyboard, get_club_content_list_keyboard,
     get_club_content_keyboard, get_club_admin_keyboard
 )
 from src.utils.text_loader import ContentLoader
+from src.utils.helpers import split_long_message
 from src.services.stars_payment import StarsPayment
 from src.services.analytics import FunnelTracker
 from src.config import Config
@@ -27,7 +29,7 @@ async def club_enter(callback: CallbackQuery):
     """Вход в раздел Портал силы."""
     user_id = callback.from_user.id
     has_access = ClubModel.has_access(user_id)
-    
+
     if has_access:
         await show_club_content(callback)
     else:
@@ -36,27 +38,27 @@ async def club_enter(callback: CallbackQuery):
 
 async def show_club_info(callback: CallbackQuery):
     """Показать информацию о клубе (для неподписанных)."""
-    # Загружаем описание из файла
     club_info = ContentLoader.load_club_info()
-    
+
     text = (
         "🔮 *ПОРТАЛ СИЛЫ — ЗАКРЫТЫЙ КЛУБ*\n\n"
         f"{club_info}\n\n"
-        "**✨ ЧТО ВНУТРИ:**\n"
+        "*✨ ЧТО ВНУТРИ:*\n"
         "• Эксклюзивные практики и медитации (аудио/текст)\n"
         "• Закрытые эфиры с мастером\n"
         "• Скидка 20% на все товары и услуги\n"
         "• Ранний доступ к новым камням\n"
         "• Персональный вопрос мастеру раз в неделю\n\n"
-        "**💰 ТАРИФЫ:**\n"
+        "*💰 ТАРИФЫ:*\n"
         "• Пробный период: 24 часа бесплатно\n"
         "• Месячная подписка: 1990⭐\n"
         "• Годовая подписка: 19900⭐ (скидка 17%)\n\n"
         "Попробуйте бесплатно и оцените все преимущества!"
     )
-    
+
     await callback.message.edit_text(
         text,
+        parse_mode="Markdown",
         reply_markup=get_club_main_keyboard()
     )
     await callback.answer()
@@ -65,7 +67,7 @@ async def show_club_info(callback: CallbackQuery):
 async def show_club_content(callback: CallbackQuery):
     """Показать список доступных материалов клуба."""
     items = ContentLoader.list_club_content()
-    
+
     if not items:
         await callback.message.edit_text(
             "📭 В клубе пока нет контента. Загляните позже.",
@@ -75,9 +77,10 @@ async def show_club_content(callback: CallbackQuery):
         )
         await callback.answer()
         return
-    
+
     await callback.message.edit_text(
         "📚 *МАТЕРИАЛЫ КЛУБА:*",
+        parse_mode="Markdown",
         reply_markup=get_club_content_list_keyboard(items)
     )
     await callback.answer()
@@ -88,18 +91,20 @@ async def club_trial(callback: CallbackQuery):
     """Активировать пробный период."""
     user_id = callback.from_user.id
     success = ClubModel.start_trial(user_id)
-    
+
     if success:
         await FunnelTracker.track(user_id, 'club_trial_started')
         await callback.message.edit_text(
             "✅ *ПРОБНЫЙ ПЕРИОД АКТИВИРОВАН!*\n\n"
             "У вас есть 24 часа бесплатного доступа ко всем материалам клуба.\n"
             "Наслаждайтесь!",
+            parse_mode="Markdown",
             reply_markup=get_club_main_keyboard()
         )
     else:
         await callback.message.edit_text(
-            "❌ Не удалось активировать пробный период. Возможно, у вас уже есть или была подписка.",
+            "❌ Не удалось активировать пробный период.\n"
+            "Возможно, у вас уже есть или была подписка.",
             reply_markup=get_club_main_keyboard()
         )
     await callback.answer()
@@ -111,11 +116,10 @@ async def club_buy(callback: CallbackQuery, state: FSMContext, bot: Bot):
     period = callback.data.replace("club_buy_", "")  # month или year
     amount = 1990 if period == "month" else 19900
     duration = 30 if period == "month" else 365
-    
+
     user_id = callback.from_user.id
-    
     await state.update_data(club_period=period, club_duration=duration)
-    
+
     await StarsPayment.create_invoice(
         bot=bot,
         user_id=user_id,
@@ -124,7 +128,7 @@ async def club_buy(callback: CallbackQuery, state: FSMContext, bot: Bot):
         payload=f"club_{period}_{user_id}",
         amount_rub=amount
     )
-    
+
     await callback.answer("💳 Счёт создан", show_alert=False)
 
 
@@ -133,40 +137,51 @@ async def club_payment_success(message: Message, state: FSMContext):
     """Обработка успешной оплаты подписки."""
     payment = message.successful_payment
     payload = payment.invoice_payload
-    
-    if payload.startswith("club_"):
-        _, period, user_id_str = payload.split("_")
+
+    if not payload.startswith("club_"):
+        return
+
+    parts = payload.split("_")
+    if len(parts) < 3:
+        return
+
+    period = parts[1]
+    user_id_str = parts[2]
+
+    try:
         user_id = int(user_id_str)
-        
-        if user_id != message.from_user.id:
-            return
-        
-        duration = 30 if period == "month" else 365
-        
-        ClubModel.activate_paid(
-            user_id=user_id,
-            payment_id=payment.telegram_payment_charge_id,
-            duration_days=duration
-        )
-        
-        # Сохраняем информацию о платеже
-        with db.cursor() as c:
-            c.execute("""
-                INSERT INTO stars_orders (user_id, order_id, item_name, stars_amount, charge_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, 0, f"Подписка клуб {period}", payment.total_amount,
-                  payment.telegram_payment_charge_id, datetime.now()))
-        
-        await message.answer(
-            "🎉 *ПОДПИСКА АКТИВИРОВАНА!*\n\n"
-            "Добро пожаловать в «Портал силы»! Теперь вам доступны все материалы клуба.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📚 МАТЕРИАЛЫ КЛУБА", callback_data="club_content")],
-                [InlineKeyboardButton(text="← В МЕНЮ", callback_data="menu")]
-            ])
-        )
-        await FunnelTracker.track(user_id, 'club_paid', period)
-        await state.clear()
+    except ValueError:
+        return
+
+    if user_id != message.from_user.id:
+        return
+
+    duration = 30 if period == "month" else 365
+
+    ClubModel.activate_paid(
+        user_id=user_id,
+        payment_id=payment.telegram_payment_charge_id,
+        duration_days=duration
+    )
+
+    with db.cursor() as c:
+        c.execute("""
+            INSERT INTO stars_orders (user_id, order_id, item_name, stars_amount, charge_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, 0, f"Подписка клуб {period}", payment.total_amount,
+              payment.telegram_payment_charge_id, datetime.now()))
+
+    await message.answer(
+        "🎉 *ПОДПИСКА АКТИВИРОВАНА!*\n\n"
+        "Добро пожаловать в «Портал силы»! Теперь вам доступны все материалы клуба.",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📚 МАТЕРИАЛЫ КЛУБА", callback_data="club_content")],
+            [InlineKeyboardButton(text="← В МЕНЮ", callback_data="menu")]
+        ])
+    )
+    await FunnelTracker.track(user_id, 'club_paid', period)
+    await state.clear()
 
 
 @router.callback_query(F.data == "club_content")
@@ -176,7 +191,7 @@ async def club_content_list(callback: CallbackQuery):
     if not ClubModel.has_access(user_id):
         await callback.answer("❌ У вас нет доступа", show_alert=True)
         return
-    
+
     await show_club_content(callback)
 
 
@@ -187,22 +202,22 @@ async def club_item_view(callback: CallbackQuery):
     if not ClubModel.has_access(user_id):
         await callback.answer("❌ У вас нет доступа", show_alert=True)
         return
-    
+
     item_id = callback.data.replace("club_item_", "")
     content = ContentLoader.get_club_content(item_id)
-    
+
     if not content:
         await callback.answer("❌ Материал не найден", show_alert=True)
         return
-    
-    # Разбиваем, если слишком длинное
+
     if len(content) > 3500:
-        parts = self.split_long_message(content)
+        parts = split_long_message(content)
         for part in parts:
-            await callback.message.answer(part)
+            await callback.message.answer(part, parse_mode="Markdown")
     else:
         await callback.message.edit_text(
             content,
+            parse_mode="Markdown",
             reply_markup=get_club_content_keyboard()
         )
     await callback.answer()
@@ -213,16 +228,3 @@ async def club_back(callback: CallbackQuery):
     """Вернуться к списку материалов."""
     await show_club_content(callback)
     await callback.answer()
-
-
-def split_long_message(text: str, max_length: int = 3500) -> list:
-    """Разбивает длинное сообщение на части."""
-    parts = []
-    while len(text) > max_length:
-        split_at = text.rfind('\n', 0, max_length)
-        if split_at == -1:
-            split_at = max_length
-        parts.append(text[:split_at])
-        text = text[split_at:].strip()
-    parts.append(text)
-    return parts
