@@ -44,7 +44,7 @@ from src.handlers import admin_scheduler
 from src.handlers import admin_site
 from src.handlers import admin_settings
 from src.handlers.admin_content import router as admin_content_router
-from src.handlers import knowledge
+from src.handlers.knowledge import router as knowledge_router
 from src.handlers.admin_stones import router as admin_stones_router
 
 # Настройка логирования
@@ -96,7 +96,7 @@ dp.include_router(admin_export.router)
 dp.include_router(admin_scheduler.router)
 dp.include_router(admin_site.router)
 dp.include_router(admin_settings.router)
-dp.include_router(knowledge.router)
+dp.include_router(knowledge_router)
 dp.include_router(admin_content_router)
 dp.include_router(admin_stones_router)
 
