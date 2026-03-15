@@ -1,6 +1,6 @@
 """
 Портал силы - закрытый клуб с подпиской.
-Пробный период 24 часа, затем оплата 990⭐/мес.
+Пробный период 24 часа, затем оплата 1990⭐/мес.
 """
 import logging
 from aiogram import Router, F, Bot
@@ -130,58 +130,6 @@ async def club_buy(callback: CallbackQuery, state: FSMContext, bot: Bot):
     )
 
     await callback.answer("💳 Счёт создан", show_alert=False)
-
-
-@router.message(F.successful_payment)
-async def club_payment_success(message: Message, state: FSMContext):
-    """Обработка успешной оплаты подписки."""
-    payment = message.successful_payment
-    payload = payment.invoice_payload
-
-    if not payload.startswith("club_"):
-        return
-
-    parts = payload.split("_")
-    if len(parts) < 3:
-        return
-
-    period = parts[1]
-    user_id_str = parts[2]
-
-    try:
-        user_id = int(user_id_str)
-    except ValueError:
-        return
-
-    if user_id != message.from_user.id:
-        return
-
-    duration = 30 if period == "month" else 365
-
-    ClubModel.activate_paid(
-        user_id=user_id,
-        payment_id=payment.telegram_payment_charge_id,
-        duration_days=duration
-    )
-
-    with db.cursor() as c:
-        c.execute("""
-            INSERT INTO stars_orders (user_id, order_id, item_name, stars_amount, charge_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (user_id, 0, f"Подписка клуб {period}", payment.total_amount,
-              payment.telegram_payment_charge_id, datetime.now()))
-
-    await message.answer(
-        "🎉 *ПОДПИСКА АКТИВИРОВАНА!*\n\n"
-        "Добро пожаловать в «Портал силы»! Теперь вам доступны все материалы клуба.",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📚 МАТЕРИАЛЫ КЛУБА", callback_data="club_content")],
-            [InlineKeyboardButton(text="← В МЕНЮ", callback_data="menu")]
-        ])
-    )
-    await FunnelTracker.track(user_id, 'club_paid', period)
-    await state.clear()
 
 
 @router.callback_query(F.data == "club_content")
