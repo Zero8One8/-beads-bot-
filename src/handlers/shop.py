@@ -247,3 +247,4 @@ async def show_payment_methods(message: Message, state: FSMContext):
 
     await state.update_data(final_total=final_total, discount_total=discount)
     await state.set_state("waiting_payment")
+
