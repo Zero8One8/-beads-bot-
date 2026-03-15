@@ -76,7 +76,8 @@ def init_db():
             promo_code TEXT,
             discount_rub REAL DEFAULT 0,
             bonus_used REAL DEFAULT 0,
-            cashback_amount REAL DEFAULT 0
+            cashback_amount REAL DEFAULT 0,
+            payment_details TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS order_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
