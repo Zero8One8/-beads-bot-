@@ -230,3 +230,4 @@ async def export_products(callback: CallbackQuery):
         parse_mode="Markdown"
     )
     await callback.message.delete()
+
